@@ -1,14 +1,9 @@
-const userIdxRule = /^\d+$/;
-const idRule = /^(?=.*[a-zA-Z])(?=.*[0-9]).{4,20}$/;
-const pwRule = /^(?=.*[a-zA-Z])(?=.*[0-9]).{4,20}$/;
-const nameRule = /^[가-힣a-zA-Z].{1,20}$/;
-const phoneRule = /^[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}$/;
-const gradeIdxRule = /^\d+$/;
-const categoryIdxRule = /^\d+$/;
-const categoryNameRule = /^[가-힣a-zA-Z].{1,40}$/;
-const searchTextRule = /^.{1,100}$/;
-const articleIdxRule = /^\d+$/;
-const articleTitleRule = /^.{1,50}$/;
-const articleContentRule = /^.{0,1000}$/;
-const commentIdxRule = /^\d+$/;
-const commentRule = /^.{1,100}$/;
+const idRegex = /^(?=.*[a-zA-Z])(?=.*[0-9]).{4,20}$/;
+const pwRegex = /^(?=.*[a-zA-Z])(?=.*[0-9]).{4,20}$/;
+const nameRegex = /^[가-힣a-zA-Z].{1,20}$/;
+const phoneRegex = /^[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}$/;
+const nonNegativeNumberRegex = /^(0|[1-9]\d*)$/;
+const textMax50 = /^\s{1,50}$/;
+const textMax1000 = /^\s{1,1000}$/;
+
+module.exports = {idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex, textMax50, textMax1000};
