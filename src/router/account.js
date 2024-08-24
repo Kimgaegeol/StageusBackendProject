@@ -12,38 +12,52 @@ router.use(session({
 
 const {idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex, textMax50, textMax1000} = regex;
 
+const mariadb = require("mariadb");
+
+const pool = mariadb.createPool({
+    host: "localhost",
+    user: "stageus",
+    password: "1234",
+    database: "scheduler",
+    connectionLimit: 10
+});
+
+async function testDb() {
+    let connection;
+    connection = await pool.getConnection();
+    const rows = await connection.query("SELECT * FROM account");
+    console.log(rows); 
+}
+
+testDb();
+
+const customError = (message,status) => {
+    const err = new Error(message);
+    err.status = status;
+    return err
+}
 
 router.post("/login",(req,res) => { //로그인
     const { id, pw } = req.body;
-
-    if(idRule.test(id) && pwRule.test(pw)) { //프론트엔드는 다 뚫릴 수 있기 때문에 예외처리 해줌
-        let sql = "SELECT idx, grade_idx FROM account WHERE id = ? AND pw = ?";
-        //존재하는 계정일시
+    try {
+        if(!idRegex.test(id)) throw new customError("id값의 양식이 올바르지 않습니다.", 400);
+        if(!pwRegex.test(pw)) throw new customError("pw값의 양식이 올바르지 않습니다.", 400);
         const idx = 19;
         const gradeIdx = 0;
         req.session.user = { //세션에 idx저장
             idx: idx,
             gradeIdx: gradeIdx
         };
-        res.send({
+        res.status(200).send({
             "success": true,
             "message": "로그인 성공",
-            "idx": req.session.user.idx,
-            "grade_idx": req.session.user.gradeIdx
         });
-        // //존재하지 않는 계정일 시,
-        // res.send({
-        //     "success": false,
-        //     "message": "존재하지 않는 계정"
-        // });
-    }
-    else {
-        res.send({
+    } catch (e) {
+        res.status(e.status || 500).send({
             "success": false,
-            "message": "제약조건 불만족"
+            "message": e.message
         });
     }
-    // ++네트워크 오류 같은 것들도 시간나면 찾아보자
 });
 //로그아웃
 router.post("/user",(req,res) => { //계정생성
