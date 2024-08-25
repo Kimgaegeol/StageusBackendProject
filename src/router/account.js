@@ -10,8 +10,7 @@ const pool = mariadb.createPool({
     host: "localhost",
     user: "stageus",
     password: "1234",
-    database: "article",
-    connectionLimit: 10
+    database: "article"
 });
 
 async function insertData(sql,list) {
@@ -38,25 +37,27 @@ async function readData(sql,list) {
     }
 }
 
-const updateData = (sql,list) => {
+async function updateData(sql,list) {
     try {
-        const result = connection.query(sql, list);
+        const connection = await pool.getConnection();
+        const result =  await connection.query(sql, list);
         console.log(result.affectedRows);
         return true;
     } catch(err) {
         console.log(err);
-        return err.message;
+        return err;
     }
 }
 
-const deleteData = (sql,list) => {
+async function deleteData(sql,list) {
     try {
-        const result = connection.query(sql, list);
+        const connection = await pool.getConnection();
+        const result =  await connection.query(sql, list);
         console.log(result.affectedRows);
         return true;
     } catch(err) {
         console.log(err);
-        return err.message;
+        return err;
     }
 }
 
@@ -66,52 +67,60 @@ const customError = (message,status) => {
     return err
 }
 
+const errorLogic = (res,e) => {
+    res.status(e.status || 500).send({
+        "status": e.status,
+        "message": e.message
+    });
+}
+
 //세션 설정 (저장되는 값 : idx, grade_idx)
 router.use(session({
     secret: "my-secret-key", //세션 암호화를 위한 비밀키
     resave: false, // 세션이 변경되지 않아도 저장할지 여부
     saveUninitialized: false, // 초기화되지 않은 세션을 저장할지 여부
-    cookie: { maxAge: 60000 } // 만료 시간 (밀리초 단위)
+    cookie: { maxAge: 600000 } // 만료 시간 (밀리초 단위)
 }));
-
-router.post("/login",(req,res) => { //로그인
+//로그인
+router.post("/login",async (req,res) => {
     const { id, pw } = req.body;
     try {
-        if(!idRegex.test(id)) throw customError({ key : "id"}, 400);
-        if(!pwRegex.test(pw)) throw customError({ key : "pw"}, 400);
-        const idx = 19;
-        const gradeIdx = 0;
-        req.session.user = { //세션에 idx저장
+        if(!idRegex.test(id)) throw customError("id", 400);
+        if(!pwRegex.test(pw)) throw customError("pw", 400);
+
+        let sql = "SELECT idx, grade_idx, name From account WHERE id = ? AND pw = ?";
+        let rows = await readData(sql,[id,pw]);
+        if(rows.length != 1) throw customError("존재하지 않는 데이터", 404);
+
+        const idx = rows[0].idx;
+        const gradeIdx = rows[0].grade_idx;
+        const name = rows[0].name;
+
+        req.session.user = {
             idx: idx,
             gradeIdx: gradeIdx
         };
-        res.status(200).send({});
-    } catch (e) {
-        res.status(e.status || 500).send({
-            "success": false,
-            "message": e.message
+
+        res.status(200).send({
+            "name" : name
         });
+    } catch (e) {
+        errorLogic(res,e);
     }
 });
-
-router.delete("/logout",(req,res) => { //로그아웃
+//로그아웃
+router.delete("/logout",(req,res) => {
     try {
-        if(!req.session.user) throw customError({ message : "세션 만료" }, 401);
+        if(!req.session.user) throw customError("세션 만료", 401);
         req.session.destroy();
         res.status(200).send({});
     } catch (e) {
-        res.status(e.status || 500).send({
-            "success": false,
-            "message": e.message
-        });
+        errorLogic(res,e);
     }
 });
-
-router.post("/user", async (req,res) => { //계정생성
-    const id = req.body.id;
-    const pw = req.body.pw;
-    const name = req.body.name;
-    const phone = req.body.phone;
+//계정생성
+router.post("/user", async (req,res) => {
+    const { id, pw, name, phone } = req.body;
     let sql;
     let rows;
     try {
@@ -128,233 +137,140 @@ router.post("/user", async (req,res) => { //계정생성
         rows = await readData(sql,[phone]);
         if(rows.length > 0) throw customError("phone", 409);
 
-        sql = "INSERT INTO account(grade_idx,id,pw,name,phone) VALUES (?,?,?,?,?)"; //grade_idx는 일단 2로 넣을 것 (0:관리자, 1:중간 관리자, 2:일반 사용자)
-        await insertData(sql,[2,id,pw,name,phone]);
+        sql = "INSERT INTO account(grade_idx,id,pw,name,phone) VALUES (?,?,?,?,?)"; //grade_idx는 일단 3로 넣을 것 (1:최종 관리자, 2:중간 관리자, 3:사용자)
+        await insertData(sql,[3,id,pw,name,phone]);
         res.status(200).send({});
     } catch (e) {
-        res.status(e.status || 500).send({
-            "status": e.status,
-            "message": e.message
-        });
+        errorLogic(res,e);
     }
 });
-
-router.get("/user",(req,res) => { //계정읽기 ( 입력한 비밀번호가 맞을 시, 계정정보 가져옴 )
-    //OBJ은 무조건 변수로 할당해서 쓰자
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료" //세션만료된 건 우짬?
-        });
-    }
-    else if(pwRule.test(req.body.pw)) {
-        const idx = req.session.user.idx;
-        const pw = req.body.pw;
-        let sql = "SELECT id,pw,name,phone FROM account WHERE pw =? AND idx = ?";
-        //한개라도 있다면 
-        res.send({
-            "success": true,
-            "message": "계정읽기 성공",
-            "id": "stageus2",
-            "pw": pw,
-            "name": "김재걸",
-            "phone": "010-5592-1087"
-        });
-        //없다면
-        res.send({
-            "success": false,
-            "message": "비밀번호가 틀림"
-        }); 
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        }); 
-    }
-});
-//계정수정 (회원 정보는 세션에 있음)
-router.put("/user/id",(req,res) => { //id
-    const id = req.body.id; //id가 아에 안왔을 경우도 적어주자 ㄱㄷㄱㄷ
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(idRule.test(id)) {
-        const idx = req.session.user.idx;
-        let sql = "UPDATE account SET id = ?"; //이것도 업데이트가 됐는 지. 안 됐는 지 확인 해야 하나?
-        res.send({
-            "success": true,
-            "message": "아이디 변경 성공"
-        });     
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });  
-    }
-});
-router.put("/user/pw",(req,res) => { //pw
+//계정읽기
+router.get("/user",async (req,res) => {
     const pw = req.body.pw;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(pwRule.test(pw)) {
+    try {
+        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-        let sql = "UPDATE account SET pw = ? WHERE idx = ?"; //이것도 업데이트가 됐는 지. 안 됐는 지 확인 해야 하나?
-        res.send({
-            "success": true,
-            "message": "비밀번호 변경 성공",
+        if(!pwRegex.test(pw)) throw customError("pw", 400);
+
+        let sql = "SELECT id,pw,name,phone FROM account WHERE idx =? AND pw = ?";
+        let rows = await readData(sql,[idx,pw]);
+        if(rows.length == 0) throw customError("잘못된 접근", 403);
+        res.status(200).send({
+            "id": rows[0].id,
+            "pw": rows[0].pw,
+            "name": rows[0].name,
+            "phone": rows[0].phone
         });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족",
-        }); 
+        
+    } catch (e) {
+        errorLogic(res,e);
     }
 });
-router.put("/user/name",(req,res) => { //name
-    const name = req.body.name; //이름이 안왔을 경우도 적어줘야 함 하;;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(nameRule.test(name)) {
+//계정수정
+router.put("/user",async (req,res) => {
+    const { id, pw, changePw, name, phone } = req.body;
+    let sql;
+    let rows;
+    try{
+        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-        let sql = "UPDATE account SET name = ? WHERE idx = ?";
-        res.send({
-            "success": true,
-            "message": "이름 변경 성공",
-        });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족",
-        }); 
-    }
-});
-router.put("/user/phone",(req,res) => { //phone
-    const phone = req.body.phone;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(phoneRule.test(phone)) {
-        const idx = req.session.user.idx;
-        let sql = "UPDATE account SET phone = ? WHERE idx = ?";
-        res.send({
-            "success": true,
-            "message": "전화번호 변경 성공"
-        });     
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
-    }
-});
-router.put("/user/grade",(req,res)=> { //grade_idx (관리자)
-    const userIdx = req.body.userIdx;
-    const userGradeIdx = req.body.gradeIdx;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(req.session.user.gradeIdx != 0) {
-        res.send({
-            "success": false,
-            "message": "관리자계정 인증 오류"
-        });     
-    }
-    else if(userIdxRule.test(userIdx) && gradeIdxRule.test(userGradeIdx)){
-        const myIdx = req.session.user.idx;
-        const mygradeIdx = req.session.user.gradeIdx;
-        let sql = "UPDATE account SET grade_idx = ? WHERE idx = ?";
-        res.send({
-            "success": true,
-            "message": "권한 변경 성공"
-        });  
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
+    
+        if(!idRegex.test(id)) throw customError("id", 400);
+        if(!pwRegex.test(pw)) throw customError("pw", 400);
+        if(!pwRegex.test(changePw)) throw customError("changePw", 400);
+        if(!nameRegex.test(name)) throw customError("name", 400);
+        if(!phoneRegex.test(phone)) throw customError("phone", 400);
+
+        sql = "SELECT pw FROM account WHERE idx = ?";
+        rows = await readData(sql,[idx]);
+        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows[0].pw != pw) throw customError("잘못된 접근", 403);
+    
+        sql = "SELECT idx FROM account WHERE id = ?";
+        rows = await readData(sql,[id]);
+        if(rows.length > 0) throw customError("id", 409)
+    
+        sql = "SELECT idx FROM account WHERE phone = ?";
+        rows = await readData(sql,[phone]);
+        if(rows.length > 0) throw customError("phone", 409);
+
+        sql = "UPDATE account SET id = ?, pw = ?, name = ?, phone = ? WHERE idx = ?";
+        await updateData(sql,[id,changePw,name,phone,idx]);
+        res.status(200).send({});
+    } catch(e) {
+        errorLogic(res,e);
     }
 })
-router.delete("/user",(req,res) => { //계정삭제
+//grade_idx 수정 (관리자)
+router.put("/user/grade",async (req,res)=> {
+    const { userIdx, userGradeIdx } = req.body;
+    try {
+        if(!req.session.user) throw customError("세션 만료", 401);
+        const gradeIdx  = req.session.user.gradeIdx;
+
+        if(!nonNegativeNumberRegex.test(userIdx)) throw customError("userIdx", 400);
+        if(!nonNegativeNumberRegex.test(userGradeIdx)) throw customError("userGradeIdx", 400);
+
+        if(gradeIdx != 1) throw customError("잘못된 접근", 403);
+
+        let sql = "UPDATE account SET grade_idx = ? WHERE idx = ?";
+        await updateData(sql,[userGradeIdx,userIdx]);
+        res.status(200).send({});
+    } catch(e) {
+        errorLogic(res,e);
+    }
+})
+//계정삭제
+router.delete("/user",async (req,res) => {
     const pw = req.body.pw;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(pwRule.test(pw)) {
+    let sql;
+    try {
+        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-        let sql = "DELETE FROM account WHERE idx = ? AND pw = ?" // 이것도 삭제 됐는 지 안 됐는 지 확인해야하나?? + 삭제됐는지 안됐는지 나중에 확인
-        res.send({
-            "success": true,
-            "message": "계정삭제 성공"
-        });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "비밀번호 제약 조건 불만족"
-        });
+    
+        if(!pwRegex.test(pw)) throw customError("pw", 400);
+
+        sql = "SELECT pw FROM account WHERE idx = ?";
+        let rows = await readData(sql,[idx]);
+        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows[0].pw != pw) throw customError("잘못된 접근", 403);
+
+        sql = "DELETE FROM account WHERE idx = ? AND pw = ?";
+        await deleteData(sql,[idx,pw]);
+        res.status(200).send({});
+    } catch(e) {
+        errorLogic(res,e);
     }
 });
-
-
-router.get("/user/id",(req,res) => { //아이디 찾기
+//아이디 찾기
+router.get("/user/id",async (req,res) => {
     const phone = req.body.phone;
-    if(phoneRule.test(phone)) {
+    try {
+        if(!phoneRegex.test(phone)) throw customError("phone", 400);
         let sql = "SELECT id FROM account WHERE phone = ?";
-        res.send({
-            "success": true,
-            "message": "아이디찾기 성공",
-            "id": "stageus1"
+        let rows = await readData(sql,[phone]);
+        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        res.status(200).send({
+            "id": rows[0].id
         });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
+    } catch(e) {
+        errorLogic(res,e);
     }
 });
-router.get("/user/pw",(req,res) => { //비밀번호 찾기
-    const id = req.body.id;
-    const phone = req.body.phone;
-    if(idRule.test(id) && phoneRule.test(phone)) {
-        let sql = "SELECT pw FROM account WHERE id = ? AND phone = ?";
-        res.send({
-            "success": true,
-            "message": "비밀번호찾기 성공",
-            "pw": "stageus1"
+//비밀번호 찾기
+router.get("/user/pw",async (req,res) => {
+    const { id, phone } = req.body;
+    try {
+        if(!idRegex.test(id)) throw customError("phone", 400);
+        if(!phoneRegex.test(phone)) throw customError("phone", 400);
+        let sql = "SELECT pw FROM account WHERE id =? AND phone = ?";
+        let rows = await readData(sql,[id,phone]);
+        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        res.status(200).send({
+            "pw": rows[0].pw
         });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
+    } catch(e) {
+        errorLogic(res,e);
     }
 });
 
