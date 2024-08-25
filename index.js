@@ -16,13 +16,13 @@ const accountRouter = require("./src/router/account");
 app.use("/account", accountRouter);
 
 const categoryRouter = require("./src/router/category");
-app.use("/account", categoryRouter);
+app.use("/category", categoryRouter);
 
 const articleRouter = require("./src/router/article");
-app.use("/account", articleRouter);
+app.use("/article", articleRouter);
 
 const commentRouter = require("./src/router/comment");
-app.use("/account", commentRouter);
+app.use("/comment", commentRouter);
 
 
 app.listen(8500, () => {

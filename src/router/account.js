@@ -2,14 +2,6 @@ const regex = require("./../constant/regx"); // regex 모듈
 const router = require("express").Router(); // express 모듈
 const session = require("express-session"); // session 모듈
 
-//세션 설정 (저장되는 값 : idx, grade_idx)
-router.use(session({
-    secret: "my-secret-key", //세션 암호화를 위한 비밀키
-    resave: false, // 세션이 변경되지 않아도 저장할지 여부
-    saveUninitialized: false, // 초기화되지 않은 세션을 저장할지 여부
-    cookie: { maxAge: 60000 } // 만료 시간 (밀리초 단위)
-}));
-
 const {idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex, textMax50, textMax1000} = regex;
 
 const mariadb = require("mariadb");
@@ -18,18 +10,55 @@ const pool = mariadb.createPool({
     host: "localhost",
     user: "stageus",
     password: "1234",
-    database: "scheduler",
+    database: "article",
     connectionLimit: 10
 });
 
-async function testDb() {
-    let connection;
-    connection = await pool.getConnection();
-    const rows = await connection.query("SELECT * FROM account");
-    console.log(rows); 
+async function insertData(sql,list) {
+    try {
+        const connection = await pool.getConnection();
+        const result =  await connection.query(sql, list);
+        console.log(result.insertId);
+        return true;
+    } catch(err) {
+        console.log(err);
+        return err;
+    }
 }
 
-testDb();
+async function readData(sql,list) {
+    try{
+        const connection = await pool.getConnection();
+        const rows = await connection.query(sql,list);
+        console.log(rows);
+        return rows;
+    } catch(err) {
+        console.log(err);
+        return err.message;
+    }
+}
+
+const updateData = (sql,list) => {
+    try {
+        const result = connection.query(sql, list);
+        console.log(result.affectedRows);
+        return true;
+    } catch(err) {
+        console.log(err);
+        return err.message;
+    }
+}
+
+const deleteData = (sql,list) => {
+    try {
+        const result = connection.query(sql, list);
+        console.log(result.affectedRows);
+        return true;
+    } catch(err) {
+        console.log(err);
+        return err.message;
+    }
+}
 
 const customError = (message,status) => {
     const err = new Error(message);
@@ -37,21 +66,26 @@ const customError = (message,status) => {
     return err
 }
 
+//세션 설정 (저장되는 값 : idx, grade_idx)
+router.use(session({
+    secret: "my-secret-key", //세션 암호화를 위한 비밀키
+    resave: false, // 세션이 변경되지 않아도 저장할지 여부
+    saveUninitialized: false, // 초기화되지 않은 세션을 저장할지 여부
+    cookie: { maxAge: 60000 } // 만료 시간 (밀리초 단위)
+}));
+
 router.post("/login",(req,res) => { //로그인
     const { id, pw } = req.body;
     try {
-        if(!idRegex.test(id)) throw new customError("id값의 양식이 올바르지 않습니다.", 400);
-        if(!pwRegex.test(pw)) throw new customError("pw값의 양식이 올바르지 않습니다.", 400);
+        if(!idRegex.test(id)) throw customError({ key : "id"}, 400);
+        if(!pwRegex.test(pw)) throw customError({ key : "pw"}, 400);
         const idx = 19;
         const gradeIdx = 0;
         req.session.user = { //세션에 idx저장
             idx: idx,
             gradeIdx: gradeIdx
         };
-        res.status(200).send({
-            "success": true,
-            "message": "로그인 성공",
-        });
+        res.status(200).send({});
     } catch (e) {
         res.status(e.status || 500).send({
             "success": false,
@@ -59,41 +93,52 @@ router.post("/login",(req,res) => { //로그인
         });
     }
 });
-//로그아웃
-router.post("/user",(req,res) => { //계정생성
-    //body사용 이유 : url에 민감한 사용자 정보를 안 보여줄 수 있음
+
+router.delete("/logout",(req,res) => { //로그아웃
+    try {
+        if(!req.session.user) throw customError({ message : "세션 만료" }, 401);
+        req.session.destroy();
+        res.status(200).send({});
+    } catch (e) {
+        res.status(e.status || 500).send({
+            "success": false,
+            "message": e.message
+        });
+    }
+});
+
+router.post("/user", async (req,res) => { //계정생성
     const id = req.body.id;
     const pw = req.body.pw;
     const name = req.body.name;
     const phone = req.body.phone;
-    if(idRule.test(id) && pwRule.test(pw) && nameRule.test(name) && phoneRule.test(phone)) {
-        let idOverLapSql = "SELECT idx FROM account WHERE id = ?"; // (아이디 중복체크) (성공시, 전화번호 중복체크로 이동)
-        let phoneOverLapSql = "SELECT idx FROM account WHERE phone = ?"; // (전화번호 중복체크) (성공시, 회원가입 과정으로 이동)
+    let sql;
+    let rows;
+    try {
+        if(!idRegex.test(id)) throw customError("id", 400);
+        if(!pwRegex.test(pw)) throw customError("pw", 400);
+        if(!nameRegex.test(name)) throw customError("name", 400);
+        if(!phoneRegex.test(phone)) throw customError("phone", 400);
 
-        let insertUserSql = "INSERT INTO account(grade_idx,id,pw,name,phone) VALUES (?,?,?,?,?)"; //grade_idx는 일단 2로 넣을 것 (0:관리자, 1:중간 관리자, 2:일반 사용자)
-        res.send({
-            "success": true,
-            "message": "회원가입 성공"
-        });
-        // //아이디 중복체크 실패
-        // res.send({
-        //     "success": false,
-        //     "message": "중복된 아이디"
-        // });
-        // //전화번호 중복체크 실패
-        // res.send({
-        //     "success": false,
-        //     "message": "중복된 전화번호"
-        // });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
-    }
+        sql = "SELECT idx FROM account WHERE id = ?"; // (아이디 중복체크) (성공시, 전화번호 중복체크로 이동)
+        rows = await readData(sql,[id]);
+        if(rows.length > 0) throw customError("id", 409)
 
+        sql = "SELECT idx FROM account WHERE phone = ?"; // (전화번호 중복체크) (성공시, 회원가입 과정으로 이동)
+        rows = await readData(sql,[phone]);
+        if(rows.length > 0) throw customError("phone", 409);
+
+        sql = "INSERT INTO account(grade_idx,id,pw,name,phone) VALUES (?,?,?,?,?)"; //grade_idx는 일단 2로 넣을 것 (0:관리자, 1:중간 관리자, 2:일반 사용자)
+        await insertData(sql,[2,id,pw,name,phone]);
+        res.status(200).send({});
+    } catch (e) {
+        res.status(e.status || 500).send({
+            "status": e.status,
+            "message": e.message
+        });
+    }
 });
+
 router.get("/user",(req,res) => { //계정읽기 ( 입력한 비밀번호가 맞을 시, 계정정보 가져옴 )
     //OBJ은 무조건 변수로 할당해서 쓰자
     if(!req.session.user) {
