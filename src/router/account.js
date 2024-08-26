@@ -1,78 +1,13 @@
-const regex = require("./../constant/regx"); // regex 모듈
 const router = require("express").Router(); // express 모듈
 const session = require("express-session"); // session 모듈
+const regex = require("./../constant/regx"); // regex 모듈
+const data = require("./../constant/data"); // data 모듈
+const error = require("./../constant/error"); // error 모듈
 
-const {idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex, textMax50, textMax1000} = regex;
+const { idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex } = regex;
+const { insertData, readData, updateData, deleteData } = data;
+const { customError, errorLogic } = error;
 
-const mariadb = require("mariadb");
-
-const pool = mariadb.createPool({
-    host: "localhost",
-    user: "stageus",
-    password: "1234",
-    database: "article"
-});
-
-async function insertData(sql,list) {
-    try {
-        const connection = await pool.getConnection();
-        const result =  await connection.query(sql, list);
-        console.log(result.insertId);
-        return true;
-    } catch(err) {
-        console.log(err);
-        return err;
-    }
-}
-
-async function readData(sql,list) {
-    try{
-        const connection = await pool.getConnection();
-        const rows = await connection.query(sql,list);
-        console.log(rows);
-        return rows;
-    } catch(err) {
-        console.log(err);
-        return err.message;
-    }
-}
-
-async function updateData(sql,list) {
-    try {
-        const connection = await pool.getConnection();
-        const result =  await connection.query(sql, list);
-        console.log(result.affectedRows);
-        return true;
-    } catch(err) {
-        console.log(err);
-        return err;
-    }
-}
-
-async function deleteData(sql,list) {
-    try {
-        const connection = await pool.getConnection();
-        const result =  await connection.query(sql, list);
-        console.log(result.affectedRows);
-        return true;
-    } catch(err) {
-        console.log(err);
-        return err;
-    }
-}
-
-const customError = (message,status) => {
-    const err = new Error(message);
-    err.status = status;
-    return err
-}
-
-const errorLogic = (res,e) => {
-    res.status(e.status || 500).send({
-        "status": e.status,
-        "message": e.message
-    });
-}
 
 //세션 설정 (저장되는 값 : idx, grade_idx)
 router.use(session({

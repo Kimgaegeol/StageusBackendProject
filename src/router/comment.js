@@ -1,6 +1,12 @@
+const router = require("express").Router(); // express 모듈
+const session = require("express-session"); // session 모듈
 const regex = require("./../constant/regx"); // regex 모듈
-const router = require("express").Router();
-const session = require("express-session");
+const data = require("./../constant/data"); // data 모듈
+const error = require("./../constant/error"); // error 모듈
+
+const {idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex, textMax50, textMax1000} = regex;
+const {insertData, readData, updateData, deleteData} = data;
+const {customError, errorLogic} = error;
 
 //세션 설정 (저장되는 값 : idx, grade_idx)
 router.use(session({
@@ -9,8 +15,6 @@ router.use(session({
     saveUninitialized: false, // 초기화되지 않은 세션을 저장할지 여부
     cookie: { maxAge: 60000 } // 만료 시간 (밀리초 단위)
 }));
-
-const {idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex, textMax50, textMax1000} = regex;
 
 router.post("/article/:articleIdx/comment/:commentIdx",(req,res) => { //댓글 생성
     const articleIdx = req.params.articleIdx;
