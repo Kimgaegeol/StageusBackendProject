@@ -1,21 +1,11 @@
 const router = require("express").Router(); // express 모듈
-const session = require("express-session"); // session 모듈
 const regex = require("./../constant/regx"); // regex 모듈
-const data = require("./../constant/data"); // data 모듈
-const error = require("./../constant/error"); // error 모듈
+const dbHelper = require("./../module/dbHelper"); // data 모듈
+const error = require("./../module/customError"); // error 모듈
 
 const { nonNegativeNumberRegex, textMax50 } = regex;
-const { insertData, readData, updateData, deleteData } = data;
+const { insertData, readData, updateData, deleteData } = dbHelper;
 const { customError, errorLogic } = error;
-
-//세션 설정 (저장되는 값 : idx, grade_idx)
-router.use(session({
-    secret: "my-secret-key", //세션 암호화를 위한 비밀키
-    resave: false, // 세션이 변경되지 않아도 저장할지 여부
-    saveUninitialized: false, // 초기화되지 않은 세션을 저장할지 여부
-    cookie: { maxAge: 60000 } // 만료 시간 (밀리초 단위)
-}));
-
 
 //카테고리 목록 읽기
 router.get("/all",async (req,res) => {

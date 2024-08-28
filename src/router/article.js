@@ -1,20 +1,11 @@
 const router = require("express").Router(); // express 모듈
-const session = require("express-session"); // session 모듈
 const regex = require("./../constant/regx"); // regex 모듈
-const data = require("./../constant/data"); // data 모듈
-const error = require("./../constant/error"); // error 모듈
+const dbHelper = require("./../module/dbHelper"); // data 모듈
+const error = require("./../module/customError"); // error 모듈
 
-const {idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex, textMax50, textMax1000} = regex;
-const {insertData, readData, updateData, deleteData} = data;
-const {customError, errorLogic} = error;
-
-//세션 설정 (저장되는 값 : idx, grade_idx)
-router.use(session({
-    secret: "my-secret-key", //세션 암호화를 위한 비밀키
-    resave: false, // 세션이 변경되지 않아도 저장할지 여부
-    saveUninitialized: false, // 초기화되지 않은 세션을 저장할지 여부
-    cookie: { maxAge: 60000 } // 만료 시간 (밀리초 단위)
-}));
+const { nonNegativeNumberRegex, textMax50, textMax1000 } = regex;
+const { insertData, readData, updateData, deleteData } = dbHelper;
+const { customError, errorLogic } = error;
 
 //카테고리별 게시글읽기 -> query로 쓰는 걸로 바꾸자 (categoryIdx),
 router.get("/all",async (req,res) => {
@@ -54,8 +45,8 @@ router.post("",async (req,res) => {
         let rows = await readData(sql,[categoryIdx]);
         if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
 
-        sql = "INSERT INTO article(category_idx,user_idx,title,content) VALUES (?,?,?,?)";
-        await insertData(sql,[categoryIdx,idx,title,content]);
+        sql = "INSERT INTO article(user_idx,category_idx,title,content) VALUES (?,?,?,?)";
+        await insertData(sql,[idx,categoryIdx,title,content]);
         res.status(200).send({});
     } catch(e) {
         errorLogic(res,e);
@@ -162,7 +153,7 @@ router.post("/:articleIdx/like",async (req,res) => {
 
         sql = "SELECT idx FROM like_article WHERE user_idx = ? AND article_idx = ?";
         let rows = await readData(sql,[idx,articleIdx]);
-        if(rows.length > 0) throw customError("중복된 데이터", 409);
+        if(rows.length > 0) throw customError("이미 좋아요가 있음", 409);
 
         sql = "INSERT INTO like_article(user_idx,article_idx) VALUES(?,?)";
         await insertData(sql,[idx,articleIdx]);
@@ -183,7 +174,7 @@ router.delete("/:articleIdx/like",async (req,res) => {
 
         sql = "SELECT idx FROM like_article WHERE user_idx = ? AND article_idx = ?";
         let rows = await readData(sql,[idx,articleIdx]);
-        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows.length == 0) throw customError("좋아요가 존재하지 않음.", 404);
 
         sql = "DELETE FROM like_article WHERE user_idx = ? AND article_idx = ?";
         await deleteData(sql,[idx,articleIdx]);
@@ -191,6 +182,6 @@ router.delete("/:articleIdx/like",async (req,res) => {
     } catch(e) {
         errorLogic(res,e);
     }
-})
+});
 
 module.exports = router;

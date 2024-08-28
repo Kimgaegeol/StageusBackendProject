@@ -1,140 +1,122 @@
 const router = require("express").Router(); // express 모듈
-const session = require("express-session"); // session 모듈
 const regex = require("./../constant/regx"); // regex 모듈
-const data = require("./../constant/data"); // data 모듈
-const error = require("./../constant/error"); // error 모듈
+const dbHelper = require("./../module/dbHelper"); // data 모듈
+const error = require("./../module/customError"); // error 모듈
 
-const {idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex, textMax50, textMax1000} = regex;
-const {insertData, readData, updateData, deleteData} = data;
+const {nonNegativeNumberRegex, textMax50} = regex;
+const {insertData, readData, updateData, deleteData} = dbHelper;
 const {customError, errorLogic} = error;
 
-//세션 설정 (저장되는 값 : idx, grade_idx)
-router.use(session({
-    secret: "my-secret-key", //세션 암호화를 위한 비밀키
-    resave: false, // 세션이 변경되지 않아도 저장할지 여부
-    saveUninitialized: false, // 초기화되지 않은 세션을 저장할지 여부
-    cookie: { maxAge: 60000 } // 만료 시간 (밀리초 단위)
-}));
-
-router.post("/article/:articleIdx/comment/:commentIdx",(req,res) => { //댓글 생성
-    const articleIdx = req.params.articleIdx;
+router.post("",async (req,res) => { //댓글 생성
+    const articleIdx = req.query.articleIdx;
     const content = req.body.content
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(articleIdxRule.test(articleIdx) && commentRule.test(content)) {
-        const userIdx = req.session.user.idx;
-        sql = "INSERT INTO comment(article_idx,user_idx,content) VALUES(?,?,?)";
-        res.send({
-            "success": true,
-            "message": "댓글 입력 성공"
-        });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
-    }
-});
-router.put("/article/:articleIdx/comment/:commentIdx",(req,res) => { //댓글 수정
-    const articleIdx = req.params.articleIdx;
-    const commentIdx = req.params.commentIdx;
-    const content = req.body.content;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(articleIdxRule.test(articleIdx) && commentIdxRule.test(commentIdx) && commentRule.test(content)) {
-        const userIdx = req.session.user.idx;
-        let sql = "UPDATE comment SET content = ? WHERE idx = ? AND articleIdx = ? AND user_idx = ?";
-        res.send({
-            "success": true,
-            "message": "댓글 수정 성공"
-        });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
+    let sql;
+    try {
+        if(!req.session.user) throw customError("세션 만료", 401);
+        const idx = req.session.user.idx;
+    
+        if(!nonNegativeNumberRegex.test(articleIdx)) throw customError("articleIdx", 400);
+        if(!textMax50.test(content)) throw customError("content", 400);
+
+        sql = "SELECT user_idx FROM article WHERE idx = ?";
+        let rows = await readData(sql,[articleIdx]);
+        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows[0].user_idx != idx) throw customError("잘못된 접근", 403);
+
+        sql = "INSERT INTO comment(user_idx,article_idx,content) VALUES (?,?,?)";
+        await insertData(sql,[idx,articleIdx,content]);
+        res.status(200).send({});
+    } catch(e) {
+        errorLogic(res,e);
     }
 });
-router.delete("/article/:articleIdx/comment/:commentIdx",(req,res) => { //댓글 삭제
-    const articleIdx = req.params.articleIdx;
+router.put("/:commentIdx",async (req,res) => { //댓글 수정
+    const articleIdx = req.query.articleIdx;
     const commentIdx = req.params.commentIdx;
     const content = req.body.content;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
+    let sql;
+    try {
+        if(!req.session.user) throw customError("세션 만료", 401);
+        const idx = req.session.user.idx;
+    
+        if(!nonNegativeNumberRegex.test(articleIdx)) throw customError("articleIdx", 400);
+        if(!nonNegativeNumberRegex.test(commentIdx)) throw customError("commentIdx", 400);
+        if(!textMax50.test(content)) throw customError("content", 400);
+
+        sql = "SELECT user_idx FROM comment WHERE idx = ?";
+        let rows = await readData(sql,[commentIdx]);
+        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows[0].user_idx != idx) throw customError("잘못된 접근", 403);
+
+        sql = "UPDATE comment SET content = ? WHERE idx = ? AND user_idx = ? AND article_idx = ?";
+        await updateData(sql,[content,commentIdx,idx,articleIdx]);
+        res.status(200).send({});
+    } catch(e) {
+        errorLogic(res,e);
     }
-    else if(articleIdxRule.test(articleIdx) && commentIdxRule.test(commentIdx) && commentRule.test(content)) {
-        const userIdx = req.session.user.idx;
-        let sql = "DELETE FROM comment WHERE idx = ? AND articleIdx = ? AND user_idx = ?";
-        res.send({
-            "success": true,
-            "message": "댓글 삭제 성공"
-        });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
+});
+router.delete("/:commentIdx",async (req,res) => { //댓글 삭제
+    const articleIdx = req.query.articleIdx;
+    const commentIdx = req.params.commentIdx;
+    let sql;
+    try {
+        if(!req.session.user) throw customError("세션 만료", 401);
+        const idx = req.session.user.idx;
+    
+        if(!nonNegativeNumberRegex.test(articleIdx)) throw customError("articleIdx", 400);
+        if(!nonNegativeNumberRegex.test(commentIdx)) throw customError("commentIdx", 400);
+
+        sql = "SELECT user_idx FROM comment WHERE idx = ?";
+        let rows = await readData(sql,[commentIdx]);
+        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows[0].user_idx != idx) throw customError("잘못된 접근", 403);
+
+        sql = "DELETE FROM comment WHERE idx = ? AND user_idx = ? AND article_idx = ?";
+        await insertData(sql,[commentIdx,idx,articleIdx]);
+        res.status(200).send({});
+    } catch(e) {
+        errorLogic(res,e);
     }
 });
 
-router.post("/comment/:commentIdx/like",(req,res) => { //댓글 좋아요 생성
+router.post("/:commentIdx/like",async (req,res) => { //댓글 좋아요 생성
     const commentIdx = req.params.commentIdx;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(commentIdxRule.test(commentIdx)) {
-        const userIdx = req.session.user.idx;
-        sql = "DELETE FROM comment_recommendation(comment_idx,user_idx) VALUES(?,?)";
-        res.send({
-            "success": true,
-            "message": "댓글 좋아요 성공"
-        });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
+    let sql;
+    try {
+        if(!req.session.user) throw customError("세션 만료", 401);
+        const idx = req.session.user.idx;
+
+        if(!nonNegativeNumberRegex.test(commentIdx)) throw customError("commentIdx", 400);
+
+        sql = "SELECT idx FROM like_comment WHERE user_idx = ? AND comment_idx = ?";
+        let rows = await readData(sql,[idx,commentIdx]);
+        if(rows.length > 0) throw customError("중복된 데이터", 409);
+
+        sql = "INSERT INTO like_comment(user_idx,comment_idx) VALUES(?,?)";
+        await insertData(sql,[idx,commentIdx]);
+        res.status(200).send({});
+    } catch(e) {
+        errorLogic(res,e);
     }
 });
-router.delete("/comment/:commentIdx/like",(req,res) => { //댓글 좋아요 삭제
+router.delete("/:commentIdx/like",async (req,res) => { //댓글 좋아요 삭제
     const commentIdx = req.params.commentIdx;
-    if(!req.session.user) {
-        res.send({
-            "success": false,
-            "message": "세션 만료"
-        });
-    }
-    else if(commentIdxRule.test(commentIdx)) {
-        const userIdx = req.session.user.idx;
-        sql = "INSERT INTO comment_recommendation WHERE comment_idx = ? AND user_idx = ?";
-        res.send({
-            "success": true,
-            "message": "댓글 좋아요 성공"
-        });
-    }
-    else {
-        res.send({
-            "success": false,
-            "message": "제약조건 불만족"
-        });
+    let sql;
+    try {
+        if(!req.session.user) throw customError("세션 만료", 401);
+        const idx = req.session.user.idx;
+
+        if(!nonNegativeNumberRegex.test(commentIdx)) throw customError("commentIdx", 400);
+
+        sql = "SELECT idx FROM like_comment WHERE user_idx = ? AND comment_idx = ?";
+        let rows = await readData(sql,[idx,commentIdx]);
+        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+
+        sql = "DELETE FROM like_article WHERE user_idx = ? AND comment_idx = ?";
+        await deleteData(sql,[idx,commentIdx]);
+        res.status(200).send({});
+    } catch(e) {
+        errorLogic(res,e);
     }
 });
 
