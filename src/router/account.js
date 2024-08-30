@@ -5,6 +5,7 @@ const customError = require("./../module/customError"); // error 모듈
 const regexCheck = require("./../middleware/regexCheck"); // 정규포현식체크 미들웨어
 const loginCheck = require("./../middleware/loginCheck");// 로그인체크 미들웨어
 const duplicateCheck = require("./../middleware/duplicateCheck");// 중복체크 미들웨어
+const roleCheck = require("./../middleware/roleCheck"); // 관리자 권한체크 미들웨어
 
 const { idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex } = regex;
 const { insertData, readData, updateData, deleteData } = dbHelper;
@@ -113,14 +114,11 @@ async (req,res) => {
 //grade_idx 수정 (관리자)
 router.put("/user/grade",
 loginCheck,
+roleCheck,
 regexCheck( [ ["userIdx",nonNegativeNumberRegex],["userGradeIdx",nonNegativeNumberRegex] ] ),
 async (req,res)=> {
     const { userIdx, userGradeIdx } = req.body;
     try {
-        const gradeIdx  = req.session.user.gradeIdx;
-
-        if(gradeIdx != 1) throw customError("잘못된 접근", 403);
-
         let sql = "UPDATE account SET grade_idx = ? WHERE idx = ?";
         await updateData(sql,[userGradeIdx,userIdx]);
         res.status(200).send({});

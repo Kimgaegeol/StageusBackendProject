@@ -2,6 +2,9 @@ const router = require("express").Router(); // express 모듈
 const regex = require("./../constant/regx"); // regex 모듈
 const dbHelper = require("./../module/dbHelper"); // data 모듈
 const customError = require("./../module/customError"); // error 모듈
+const loginCheck = require("../middleware/loginCheck");
+const regexCheck = require("../middleware/regexCheck");
+const { text } = require("express");
 
 const { nonNegativeNumberRegex, textMax50 } = regex;
 const { insertData, readData, updateData, deleteData } = dbHelper;
@@ -19,14 +22,14 @@ router.get("/all",async (req,res) => {
     }
 });
 //카테고리 생성 (관리자)
-router.post("",async (req,res) => {
+router.post("",
+loginCheck,
+regexCheck( [ ["categoryName", textMax50] ] ),
+async (req,res) => {
     const categoryName = req.body.categoryName;
     let sql;
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const gradeIdx  = req.session.user.gradeIdx;
-
-        if(!textMax50.test(categoryName)) throw customError("categoryName", 400);
 
         if(gradeIdx != 1) throw customError("잘못된 접근", 403);
 
