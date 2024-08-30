@@ -1,11 +1,10 @@
 const router = require("express").Router(); // express 모듈
 const regex = require("./../constant/regx"); // regex 모듈
 const dbHelper = require("./../module/dbHelper"); // data 모듈
-const error = require("./../module/customError"); // error 모듈
+const customError = require("./../module/customError"); // error 모듈
 
 const {nonNegativeNumberRegex, textMax50} = regex;
 const {insertData, readData, updateData, deleteData} = dbHelper;
-const {customError, errorLogic} = error;
 
 router.post("",async (req,res) => { //댓글 생성
     const articleIdx = req.query.articleIdx;
@@ -27,7 +26,7 @@ router.post("",async (req,res) => { //댓글 생성
         await insertData(sql,[idx,articleIdx,content]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 router.put("/:commentIdx",async (req,res) => { //댓글 수정
@@ -52,7 +51,7 @@ router.put("/:commentIdx",async (req,res) => { //댓글 수정
         await updateData(sql,[content,commentIdx,idx,articleIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 router.delete("/:commentIdx",async (req,res) => { //댓글 삭제
@@ -75,7 +74,7 @@ router.delete("/:commentIdx",async (req,res) => { //댓글 삭제
         await insertData(sql,[commentIdx,idx,articleIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 
@@ -96,7 +95,7 @@ router.post("/:commentIdx/like",async (req,res) => { //댓글 좋아요 생성
         await insertData(sql,[idx,commentIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 router.delete("/:commentIdx/like",async (req,res) => { //댓글 좋아요 삭제
@@ -116,7 +115,7 @@ router.delete("/:commentIdx/like",async (req,res) => { //댓글 좋아요 삭제
         await deleteData(sql,[idx,commentIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 

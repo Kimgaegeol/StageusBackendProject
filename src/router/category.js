@@ -1,11 +1,10 @@
 const router = require("express").Router(); // express 모듈
 const regex = require("./../constant/regx"); // regex 모듈
 const dbHelper = require("./../module/dbHelper"); // data 모듈
-const error = require("./../module/customError"); // error 모듈
+const customError = require("./../module/customError"); // error 모듈
 
 const { nonNegativeNumberRegex, textMax50 } = regex;
 const { insertData, readData, updateData, deleteData } = dbHelper;
-const { customError, errorLogic } = error;
 
 //카테고리 목록 읽기
 router.get("/all",async (req,res) => {
@@ -16,7 +15,7 @@ router.get("/all",async (req,res) => {
             rows
         });
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //카테고리 생성 (관리자)
@@ -39,7 +38,7 @@ router.post("",async (req,res) => {
         await insertData(sql,[categoryName]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //카테고리 수정 (관리자)
@@ -69,7 +68,7 @@ router.put("/:categoryIdx",async (req,res) => {
         await updateData(sql,[categoryName,categoryIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //카테고리 삭제 (관리자)
@@ -92,7 +91,7 @@ router.delete("/:categoryIdx",async (req,res) => {
         await deleteData(sql,[categoryIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 

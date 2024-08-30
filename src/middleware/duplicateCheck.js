@@ -1,8 +1,7 @@
 const dbHelper = require("./../module/dbHelper"); // data 모듈
-const error = require("./../module/customError");
+const customError = require("./../module/customError");
 
 const {readData} = dbHelper;
-const { customError, errorLogic } = error;
 
 
 const duplicateCheck = (sql,name,valueList) => {
@@ -16,7 +15,7 @@ const duplicateCheck = (sql,name,valueList) => {
             
             next();
         } catch(e) {
-            errorLogic(res,e);
+            next(e);
         }
     }
     return middleware;

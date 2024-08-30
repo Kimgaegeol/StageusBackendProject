@@ -1,5 +1,4 @@
-const error = require("./../module/customError");
-const { customError, errorLogic } = error;
+const customError = require("./../module/customError");
 
 const regexCheck = (valueList) => {
     const middleware = (req,res, next) => {
@@ -13,7 +12,7 @@ const regexCheck = (valueList) => {
 
             next();
         } catch(e) {
-            errorLogic(res, e);
+            next(e);
         }
     }
     return middleware;

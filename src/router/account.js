@@ -1,25 +1,24 @@
 const router = require("express").Router(); // express 모듈
 const regex = require("./../constant/regx"); // regex 모듈
 const dbHelper = require("./../module/dbHelper"); // data 모듈
-const error = require("./../module/customError"); // error 모듈
-
-const regexCheck = require("./../middleware/regexCheck");
-const loginCheck = require("./../middleware/loginCheck");
-const duplicateCheck = require("./../middleware/duplicateCheck");
+const customError = require("./../module/customError"); // error 모듈
+const regexCheck = require("./../middleware/regexCheck"); // 정규포현식체크 미들웨어
+const loginCheck = require("./../middleware/loginCheck");// 로그인체크 미들웨어
+const duplicateCheck = require("./../middleware/duplicateCheck");// 중복체크 미들웨어
 
 const { idRegex, pwRegex, nameRegex, phoneRegex, nonNegativeNumberRegex } = regex;
 const { insertData, readData, updateData, deleteData } = dbHelper;
-const { customError, errorLogic } = error;
 
 
 //로그인
-router.post("/login", regexCheck( [ ["id", idRegex],["pw", pwRegex] ] ),
-async (req,res) => {
+router.post("/login",
+regexCheck( [ ["id", idRegex],["pw", pwRegex] ] ),
+async (req,res, next) => {
     const { id, pw } = req.body;
     try {
         let sql = "SELECT idx, grade_idx, name From account WHERE id = ? AND pw = ?";
         let rows = await readData(sql,[id,pw]);
-        if(rows.length != 1) throw customError("존재하지 않는 데이터", 404);
+        if(rows.length != 1) throw customError("존재하지 않는 유저 입니다.", 404);
 
         const idx = rows[0].idx;
         const gradeIdx = rows[0].grade_idx;
@@ -27,28 +26,30 @@ async (req,res) => {
 
         req.session.user = {
             idx: idx,
-            gradeIdx: gradeIdx
+            gradeIdx: gradeIdx,
+            name: name
         };
 
-        res.status(200).send({ //값을 주고 싶다면 다 session으로 줘야 함
-            // "name" : name
-        });
+        res.status(200).send({});
     } catch (e) {
-        errorLogic(res,e);
+        next(e);
     }
-});
+}
+);
 //로그아웃
-router.delete("/logout",(req,res) => {
+router.delete("/logout",
+loginCheck,
+(req,res) => {
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         req.session.destroy();
         res.status(200).send({});
     } catch (e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //계정생성
-router.post("/user", regexCheck( [ ["id", idRegex],["pw", pwRegex],["name", nameRegex],["phone", phoneRegex] ] ),
+router.post("/user",
+regexCheck( [ ["id", idRegex],["pw", pwRegex],["name", nameRegex],["phone", phoneRegex] ] ),
 duplicateCheck( "SELECT idx FROM account WHERE id = ?","id",["id"] ),
 duplicateCheck( "SELECT idx FROM account WHERE phone = ?","phone",["phone"] ),
 async (req,res) => {
@@ -58,16 +59,17 @@ async (req,res) => {
         await insertData(sql,[3,id,pw,name,phone]);
         res.status(200).send({});
     } catch (e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //계정읽기
-router.get("/user",async (req,res) => {
+router.get("/user",
+loginCheck,
+regexCheck( [ ["pw", pwRegex] ] ),
+async (req,res) => {
     const pw = req.body.pw;
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-        if(!pwRegex.test(pw)) throw customError("pw", 400);
 
         let sql = "SELECT id,pw,name,phone FROM account WHERE idx =? AND pw = ?";
         let rows = await readData(sql,[idx,pw]);
@@ -80,53 +82,42 @@ router.get("/user",async (req,res) => {
         });
         
     } catch (e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //계정수정
-router.put("/user",async (req,res) => {
+router.put("/user",
+loginCheck,
+regexCheck( [ ["id", idRegex],["pw", pwRegex],["changePw", pwRegex],["name", nameRegex],["phone", phoneRegex] ] ),
+duplicateCheck( "SELECT idx FROM account WHERE id = ?","id",["id"] ),
+duplicateCheck( "SELECT idx FROM account WHERE phone = ?","phone",["phone"] ),
+async (req,res) => {
     const { id, pw, changePw, name, phone } = req.body;
     let sql;
     let rows;
     try{
-        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-    
-        if(!idRegex.test(id)) throw customError("id", 400);
-        if(!pwRegex.test(pw)) throw customError("pw", 400);
-        if(!pwRegex.test(changePw)) throw customError("changePw", 400);
-        if(!nameRegex.test(name)) throw customError("name", 400);
-        if(!phoneRegex.test(phone)) throw customError("phone", 400);
 
         sql = "SELECT pw FROM account WHERE idx = ?";
         rows = await readData(sql,[idx]);
-        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
         if(rows[0].pw != pw) throw customError("잘못된 접근", 403);
-    
-        sql = "SELECT idx FROM account WHERE id = ?";
-        rows = await readData(sql,[id]);
-        if(rows.length > 0) throw customError("id", 409)
-    
-        sql = "SELECT idx FROM account WHERE phone = ?";
-        rows = await readData(sql,[phone]);
-        if(rows.length > 0) throw customError("phone", 409);
 
         sql = "UPDATE account SET id = ?, pw = ?, name = ?, phone = ? WHERE idx = ?";
         await updateData(sql,[id,changePw,name,phone,idx]);
+        req.session.destroy();
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 })
 //grade_idx 수정 (관리자)
-router.put("/user/grade",async (req,res)=> {
+router.put("/user/grade",
+loginCheck,
+regexCheck( [ ["userIdx",nonNegativeNumberRegex],["userGradeIdx",nonNegativeNumberRegex] ] ),
+async (req,res)=> {
     const { userIdx, userGradeIdx } = req.body;
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const gradeIdx  = req.session.user.gradeIdx;
-
-        if(!nonNegativeNumberRegex.test(userIdx)) throw customError("userIdx", 400);
-        if(!nonNegativeNumberRegex.test(userGradeIdx)) throw customError("userGradeIdx", 400);
 
         if(gradeIdx != 1) throw customError("잘못된 접근", 403);
 
@@ -134,60 +125,61 @@ router.put("/user/grade",async (req,res)=> {
         await updateData(sql,[userGradeIdx,userIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 })
 //계정삭제
-router.delete("/user",async (req,res) => {
+router.delete("/user",
+loginCheck,
+regexCheck( [ ["pw", pwRegex] ] ),
+async (req,res) => {
     const pw = req.body.pw;
     let sql;
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
     
-        if(!pwRegex.test(pw)) throw customError("pw", 400);
-
         sql = "SELECT pw FROM account WHERE idx = ?";
         let rows = await readData(sql,[idx]);
-        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
         if(rows[0].pw != pw) throw customError("잘못된 접근", 403);
 
         sql = "DELETE FROM account WHERE idx = ? AND pw = ?";
         await deleteData(sql,[idx,pw]);
+        req.session.destroy();
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //아이디 찾기
-router.get("/user/id",async (req,res) => {
+router.get("/user/id",
+regexCheck( [ ["phone", phoneRegex] ] ),
+async (req,res) => {
     const phone = req.body.phone;
     try {
-        if(!phoneRegex.test(phone)) throw customError("phone", 400);
         let sql = "SELECT id FROM account WHERE phone = ?";
         let rows = await readData(sql,[phone]);
-        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows.length == 0) throw customError("알맞은 id가 존재하지 않습니다.", 404);
         res.status(200).send({
             "id": rows[0].id
         });
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //비밀번호 찾기
-router.get("/user/pw",async (req,res) => {
+router.get("/user/pw",
+regexCheck( [ ["id", idRegex],["phone", phoneRegex] ] ),
+async (req,res) => {
     const { id, phone } = req.body;
     try {
-        if(!idRegex.test(id)) throw customError("phone", 400);
-        if(!phoneRegex.test(phone)) throw customError("phone", 400);
         let sql = "SELECT pw FROM account WHERE id =? AND phone = ?";
         let rows = await readData(sql,[id,phone]);
-        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows.length == 0) throw customError("알맞은 pw가 존재하지 않습니다.", 404);
         res.status(200).send({
             "pw": rows[0].pw
         });
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 

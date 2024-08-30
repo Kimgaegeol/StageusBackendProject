@@ -1,11 +1,10 @@
 const router = require("express").Router(); // express 모듈
 const regex = require("./../constant/regx"); // regex 모듈
 const dbHelper = require("./../module/dbHelper"); // data 모듈
-const error = require("./../module/customError"); // error 모듈
+const customError = require("./../module/customError"); // error 모듈
 
 const { nonNegativeNumberRegex, textMax50, textMax1000 } = regex;
 const { insertData, readData, updateData, deleteData } = dbHelper;
-const { customError, errorLogic } = error;
 
 //카테고리별 게시글읽기 -> query로 쓰는 걸로 바꾸자 (categoryIdx),
 router.get("/all",async (req,res) => {
@@ -25,7 +24,7 @@ router.get("/all",async (req,res) => {
             rows
         });
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //게시글 생성
@@ -49,7 +48,7 @@ router.post("",async (req,res) => {
         await insertData(sql,[idx,categoryIdx,title,content]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //게시글 읽기
@@ -65,7 +64,7 @@ router.get("/:articleIdx",async (req,res) => {
             rows
         });
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
     // let articleRecommendationSql = "SELECT COUNT(*) FROM article_recommendation WHERE article_idx = ?";
     // let commentSql = "SELECT account.name, comment.* FROM comment INNER JOIN account ON comment.user_idx = account.idx WHERE comment.article_idx = ?";
@@ -92,7 +91,7 @@ router.put("/:articleIdx",async (req,res) => {
         await updateData(sql,[title,content,articleIdx,idx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //게시글 삭제
@@ -114,7 +113,7 @@ router.delete("/:articleIdx",async (req,res) => {
         await deleteData(sql,[articleIdx,idx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //게시글 검색 (이것도 categoryIdx는 옵션느낌으로 query처리하자)
@@ -138,7 +137,7 @@ router.get("/all/search",async (req,res) => {
             rows
         });
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //게시글 좋아요 생성
@@ -159,7 +158,7 @@ router.post("/:articleIdx/like",async (req,res) => {
         await insertData(sql,[idx,articleIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 //게시글 좋아요 삭제
@@ -180,7 +179,7 @@ router.delete("/:articleIdx/like",async (req,res) => {
         await deleteData(sql,[idx,articleIdx]);
         res.status(200).send({});
     } catch(e) {
-        errorLogic(res,e);
+        next(e);
     }
 });
 

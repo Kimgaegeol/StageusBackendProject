@@ -24,6 +24,11 @@ app.use("/article", articleRouter);
 const commentRouter = require("./src/router/comment");
 app.use("/comment", commentRouter);
 
+const notFoundMiddleware = require("./src/middleware/notFound");
+app.use(notFoundMiddleware);
+
+const errorHandlerMiddleware = require("./src/middleware/errorHandler");
+app.use(errorHandlerMiddleware);
 
 app.listen(8500, () => {
     console.log("8500번 포트에서 웹 서버 실행됨");
