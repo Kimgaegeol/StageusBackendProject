@@ -1,19 +1,22 @@
-const router = require("express").Router(); // express 모듈
-const regex = require("./../constant/regx"); // regex 모듈
-const dbHelper = require("./../module/dbHelper"); // data 모듈
-const customError = require("./../module/customError"); // error 모듈
+const router = require("express").Router();
+const regex = require("./../constant/regx");
+const dbHelper = require("./../module/dbHelper");
+const customError = require("./../module/customError");
 const loginCheck = require("../middleware/loginCheck");
 const regexCheck = require("../middleware/regexCheck");
-const { text } = require("express");
+const duplicateCheck = require("./../middleware/duplicateCheck");
+const roleCheck = require("./../middleware/roleCheck");
+const dataCheck = require("./../middleware/dataCheck"); // 데이터체크 미들웨어(404)
 
 const { nonNegativeNumberRegex, textMax50 } = regex;
 const { insertData, readData, updateData, deleteData } = dbHelper;
 
 //카테고리 목록 읽기
-router.get("/all",async (req,res) => {
+router.get("/all",
+async (req,res) => {
     try {
-        let sql = "SELECT * FROM category ORDER BY idx";
-        let rows = await readData(sql);
+        const sql = "SELECT * FROM category ORDER BY idx";
+        const rows = await readData(sql);
         res.status(200).send({
             rows
         });
@@ -24,20 +27,13 @@ router.get("/all",async (req,res) => {
 //카테고리 생성 (관리자)
 router.post("",
 loginCheck,
+roleCheck,
 regexCheck( [ ["categoryName", textMax50] ] ),
 async (req,res) => {
-    const categoryName = req.body.categoryName;
-    let sql;
     try {
-        const gradeIdx  = req.session.user.gradeIdx;
+        const categoryName = req.body.categoryName;
 
-        if(gradeIdx != 1) throw customError("잘못된 접근", 403);
-
-        sql = "SELECT idx FROM category WHERE name = ?";
-        let rows = await readData(sql,[categoryName]);
-        if(rows.length > 0) throw customError("categoryName", 409)
-
-        sql = "INSERT INTO category(name) VALUES (?)";
+        const sql = "INSERT INTO category(name) VALUES (?)";
         await insertData(sql,[categoryName]);
         res.status(200).send({});
     } catch(e) {
@@ -45,29 +41,18 @@ async (req,res) => {
     }
 });
 //카테고리 수정 (관리자)
-router.put("/:categoryIdx",async (req,res) => {
-    const categoryIdx = req.params.categoryIdx;
-    const categoryName = req.body.categoryName;
-    let sql;
-    let rows;
+router.put("/:categoryIdx",
+loginCheck,
+roleCheck,
+regexCheck( [ ["categoryIdx", nonNegativeNumberRegex],["categoryName", textMax50] ] ),
+dataCheck( "SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
+duplicateCheck( "SELECT idx FROM category WHERE name = ?","categoryIdx",["categoryName"] ),
+async (req,res) => {
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
-        const gradeIdx  = req.session.user.gradeIdx;
+        const categoryIdx = req.params.categoryIdx;
+        const categoryName = req.body.categoryName;
 
-        if(!nonNegativeNumberRegex.test(categoryIdx)) throw customError("categoryIdx", 400);
-        if(!textMax50.test(categoryName)) throw customError("categoryName", 400);
-
-        if(gradeIdx != 1) throw customError("잘못된 접근", 403);
-
-        sql = "SELECT name FROM category WHERE idx = ?";
-        rows = await readData(sql,[categoryIdx]);
-        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
-
-        sql = "SELECT idx FROM category WHERE name = ?";
-        rows = await readData(sql,[categoryName]);
-        if(rows.length > 0) throw customError("categoryName", 409);
-
-        sql = "UPDATE category SET name = ? WHERE idx = ?";
+        const sql = "UPDATE category SET name = ? WHERE idx = ?";
         await updateData(sql,[categoryName,categoryIdx]);
         res.status(200).send({});
     } catch(e) {
@@ -75,22 +60,16 @@ router.put("/:categoryIdx",async (req,res) => {
     }
 });
 //카테고리 삭제 (관리자)
-router.delete("/:categoryIdx",async (req,res) => {
-    const categoryIdx = req.params.categoryIdx;
-    let sql;
+router.delete("/:categoryIdx",
+loginCheck,
+roleCheck,
+regexCheck( [ ["categoryIdx", nonNegativeNumberRegex] ] ),
+dataCheck( "SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
+async (req,res) => {
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
-        const gradeIdx  = req.session.user.gradeIdx;
+        const categoryIdx = req.params.categoryIdx;
 
-        if(!nonNegativeNumberRegex.test(categoryIdx)) throw customError("categoryIdx", 400);
-
-        if(gradeIdx != 1) throw customError("잘못된 접근", 403);
-
-        sql = "SELECT name FROM category WHERE idx = ?";
-        let rows = await readData(sql,[categoryIdx]);
-        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
-
-        sql = "DELETE FROM category WHERE idx = ?";
+        const sql = "DELETE FROM category WHERE idx = ?";
         await deleteData(sql,[categoryIdx]);
         res.status(200).send({});
     } catch(e) {
