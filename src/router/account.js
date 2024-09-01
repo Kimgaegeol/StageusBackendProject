@@ -19,7 +19,7 @@ async (req,res, next) => {
 
         const sql = "SELECT idx, grade_idx, name From account WHERE id = ? AND pw = ?";
         const rows = await readData(sql,[id,pw]);
-        if(rows.length != 1) throw customError("존재하지 않는 유저 입니다.", 404);
+        if(rows.length == 0) throw customError("존재하지 않는 유저 입니다.", 404);
 
         const idx = rows[0].idx;
         const gradeIdx = rows[0].grade_idx;

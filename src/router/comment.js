@@ -2,23 +2,27 @@ const router = require("express").Router(); // express 모듈
 const regex = require("./../constant/regx"); // regex 모듈
 const dbHelper = require("./../module/dbHelper"); // data 모듈
 const customError = require("./../module/customError"); // error 모듈
+const loginCheck = require("../middleware/loginCheck");
+const regexCheck = require("../middleware/regexCheck");
+const duplicateCheck = require("./../middleware/duplicateCheck");
+const roleCheck = require("./../middleware/roleCheck");
+const dataCheck = require("./../middleware/dataCheck");
 
 const {nonNegativeNumberRegex, textMax50} = regex;
 const {insertData, readData, updateData, deleteData} = dbHelper;
 
-router.post("",async (req,res) => { //댓글 생성
-    const articleIdx = req.query.articleIdx;
-    const content = req.body.content
-    let sql;
+router.post("",
+loginCheck,
+regexCheck( [ ["articleIdx",nonNegativeNumberRegex],["content",textMax50] ] ),
+async (req,res) => { //댓글 생성
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-    
-        if(!nonNegativeNumberRegex.test(articleIdx)) throw customError("articleIdx", 400);
-        if(!textMax50.test(content)) throw customError("content", 400);
+        const articleIdx = req.query.articleIdx;
+        const content = req.body.content
+        let sql;
 
-        sql = "SELECT user_idx FROM article WHERE idx = ?";
-        let rows = await readData(sql,[articleIdx]);
+        sql = "SELECT user_idx FROM article WHERE idx = ?"; 
+        const rows = await readData(sql,[articleIdx]);
         if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
         if(rows[0].user_idx != idx) throw customError("잘못된 접근", 403);
 
@@ -29,21 +33,19 @@ router.post("",async (req,res) => { //댓글 생성
         next(e);
     }
 });
-router.put("/:commentIdx",async (req,res) => { //댓글 수정
-    const articleIdx = req.query.articleIdx;
-    const commentIdx = req.params.commentIdx;
-    const content = req.body.content;
-    let sql;
+router.put("/:commentIdx",
+loginCheck,
+regexCheck( [ ["articleIdx",nonNegativeNumberRegex],["commentIdx",nonNegativeNumberRegex],["content",textMax50] ] ),
+async (req,res) => { //댓글 수정
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-    
-        if(!nonNegativeNumberRegex.test(articleIdx)) throw customError("articleIdx", 400);
-        if(!nonNegativeNumberRegex.test(commentIdx)) throw customError("commentIdx", 400);
-        if(!textMax50.test(content)) throw customError("content", 400);
+        const articleIdx = req.query.articleIdx;
+        const commentIdx = req.params.commentIdx;
+        const content = req.body.content;
+        let sql;
 
         sql = "SELECT user_idx FROM comment WHERE idx = ?";
-        let rows = await readData(sql,[commentIdx]);
+        const rows = await readData(sql,[commentIdx]);
         if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
         if(rows[0].user_idx != idx) throw customError("잘못된 접근", 403);
 
@@ -54,19 +56,18 @@ router.put("/:commentIdx",async (req,res) => { //댓글 수정
         next(e);
     }
 });
-router.delete("/:commentIdx",async (req,res) => { //댓글 삭제
-    const articleIdx = req.query.articleIdx;
-    const commentIdx = req.params.commentIdx;
-    let sql;
+router.delete("/:commentIdx",
+loginCheck,
+regexCheck( [ ["articleIdx",nonNegativeNumberRegex],["commentIdx",nonNegativeNumberRegex] ] ),
+async (req,res) => { //댓글 삭제
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-    
-        if(!nonNegativeNumberRegex.test(articleIdx)) throw customError("articleIdx", 400);
-        if(!nonNegativeNumberRegex.test(commentIdx)) throw customError("commentIdx", 400);
+        const articleIdx = req.query.articleIdx;
+        const commentIdx = req.params.commentIdx;
+        let sql;
 
         sql = "SELECT user_idx FROM comment WHERE idx = ?";
-        let rows = await readData(sql,[commentIdx]);
+        const rows = await readData(sql,[commentIdx]);
         if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
         if(rows[0].user_idx != idx) throw customError("잘못된 접근", 403);
 
@@ -78,14 +79,14 @@ router.delete("/:commentIdx",async (req,res) => { //댓글 삭제
     }
 });
 
-router.post("/:commentIdx/like",async (req,res) => { //댓글 좋아요 생성
-    const commentIdx = req.params.commentIdx;
-    let sql;
+router.post("/:commentIdx/like",
+loginCheck,
+regexCheck( [ ["commentIdx",nonNegativeNumberRegex] ] ),
+async (req,res) => { //댓글 좋아요 생성
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-
-        if(!nonNegativeNumberRegex.test(commentIdx)) throw customError("commentIdx", 400);
+        const commentIdx = req.params.commentIdx;
+        let sql;
 
         sql = "SELECT idx FROM like_comment WHERE user_idx = ? AND comment_idx = ?";
         let rows = await readData(sql,[idx,commentIdx]);
@@ -98,14 +99,14 @@ router.post("/:commentIdx/like",async (req,res) => { //댓글 좋아요 생성
         next(e);
     }
 });
-router.delete("/:commentIdx/like",async (req,res) => { //댓글 좋아요 삭제
-    const commentIdx = req.params.commentIdx;
-    let sql;
+router.delete("/:commentIdx/like",
+loginCheck,
+regexCheck( [ ["commentIdx",nonNegativeNumberRegex] ] ),
+async (req,res) => { //댓글 좋아요 삭제
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
         const idx = req.session.user.idx;
-
-        if(!nonNegativeNumberRegex.test(commentIdx)) throw customError("commentIdx", 400);
+        const commentIdx = req.params.commentIdx;
+        let sql;
 
         sql = "SELECT idx FROM like_comment WHERE user_idx = ? AND comment_idx = ?";
         let rows = await readData(sql,[idx,commentIdx]);

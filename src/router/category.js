@@ -1,12 +1,11 @@
 const router = require("express").Router();
 const regex = require("./../constant/regx");
 const dbHelper = require("./../module/dbHelper");
-const customError = require("./../module/customError");
 const loginCheck = require("../middleware/loginCheck");
 const regexCheck = require("../middleware/regexCheck");
 const duplicateCheck = require("./../middleware/duplicateCheck");
 const roleCheck = require("./../middleware/roleCheck");
-const dataCheck = require("./../middleware/dataCheck"); // 데이터체크 미들웨어(404)
+const dataCheck = require("./../middleware/dataCheck");
 
 const { nonNegativeNumberRegex, textMax50 } = regex;
 const { insertData, readData, updateData, deleteData } = dbHelper;
