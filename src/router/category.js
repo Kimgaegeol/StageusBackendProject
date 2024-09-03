@@ -12,7 +12,7 @@ const { insertData, readData, updateData, deleteData } = dbHelper;
 
 //카테고리 목록 읽기
 router.get("/all",
-async (req,res) => {
+async (req,res, next) => {
     try {
         const sql = "SELECT * FROM category ORDER BY idx";
         const rows = await readData(sql);
@@ -28,7 +28,7 @@ router.post("",
 loginCheck,
 roleCheck,
 regexCheck( [ ["categoryName", textMax50] ] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const categoryName = req.body.categoryName;
 
@@ -46,7 +46,7 @@ roleCheck,
 regexCheck( [ ["categoryIdx", nonNegativeNumberRegex],["categoryName", textMax50] ] ),
 dataCheck( "SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
 duplicateCheck( "SELECT idx FROM category WHERE name = ?","categoryIdx",["categoryName"] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const categoryIdx = req.params.categoryIdx;
         const categoryName = req.body.categoryName;
@@ -64,7 +64,7 @@ loginCheck,
 roleCheck,
 regexCheck( [ ["categoryIdx", nonNegativeNumberRegex] ] ),
 dataCheck( "SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const categoryIdx = req.params.categoryIdx;
 

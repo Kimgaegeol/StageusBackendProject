@@ -8,7 +8,6 @@ const duplicateCheck = (sql,name,valueList) => {
     const middleware = async (req,res, next) => {
         try {
             const resultList = valueList.map(elem => req.body[elem] || req.query[elem] || req.params[elem])
-            console.log(resultList);
 
             let rows = await readData(sql,resultList);
             if(rows.length > 0) throw customError(name,409);

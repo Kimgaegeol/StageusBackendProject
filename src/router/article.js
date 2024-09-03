@@ -4,9 +4,7 @@ const dbHelper = require("./../module/dbHelper"); // data 모듈
 const customError = require("./../module/customError"); // error 모듈
 const loginCheck = require("../middleware/loginCheck");
 const regexCheck = require("../middleware/regexCheck");
-const duplicateCheck = require("./../middleware/duplicateCheck");
-const roleCheck = require("./../middleware/roleCheck");
-const dataCheck = require("./../middleware/dataCheck"); // 데이터체크 미들웨어(404)
+const dataCheck = require("./../middleware/dataCheck");
 
 const { nonNegativeNumberRegex, textMax50, textMax1000 } = regex;
 const { insertData, readData, updateData, deleteData } = dbHelper;
@@ -15,7 +13,7 @@ const { insertData, readData, updateData, deleteData } = dbHelper;
 router.get("/all",
 regexCheck( [ ["categoryIdx", nonNegativeNumberRegex] ] ),
 dataCheck( "SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const categoryIdx = req.query.categoryIdx;
         const sql = "SELECT account.name, article.idx, article.user_idx, article.category_idx, article.title FROM article INNER JOIN account ON article.user_idx = account.idx WHERE article.category_idx = ?";
@@ -32,7 +30,7 @@ router.post("",
 loginCheck,
 regexCheck( [ ["categoryIdx",nonNegativeNumberRegex],["title",textMax50],["content",textMax1000] ] ),
 dataCheck("SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다."),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const categoryIdx = req.query.categoryIdx;
         const { title, content } = req.body;
@@ -48,26 +46,31 @@ async (req,res) => {
 //게시글 읽기
 router.get("/:articleIdx",
 regexCheck( [ ["articleIdx",nonNegativeNumberRegex] ] ), // db통신 두번 할 필요 없어서 dataCheck 생략
-async (req,res) => {
+async (req,res, next) => {
     try {
         const articleIdx = req.params.articleIdx;
-        let sql = "SELECT account.name, article.* FROM article INNER JOIN account ON article.user_idx = account.idx WHERE article.idx = ?";
+        let sql = "SELECT account.name, article.*, COUNT(*) like_count FROM article INNER JOIN account ON article.user_idx = account.idx INNER JOIN like_article ON article.idx = like_article.article_idx WHERE article.idx = ?";
         let rows = await readData(sql,[articleIdx]);
-        if(rows.length == 0) throw customError("존재하지 않는 데이터", 404);
+        if(rows.length == 0) throw customError("존재하지 않는 게시글입니다.", 404);
+        // BigInt 필드가 있는 경우 문자열로 변환
+        rows = rows.map(row => {
+            return {
+                ...row,
+                like_count: row.like_count.toString()  // BigInt를 문자열로 변환
+            };
+        });
         res.status(200).send({
             rows
         });
     } catch(e) {
         next(e);
     }
-    // let articleRecommendationSql = "SELECT COUNT(*) FROM article_recommendation WHERE article_idx = ?";
-    // let commentSql = "SELECT account.name, comment.* FROM comment INNER JOIN account ON comment.user_idx = account.idx WHERE comment.article_idx = ?";
 });
 //게시글 수정
 router.put("/:articleIdx",
 loginCheck,
 regexCheck( [ ["articleIdx",nonNegativeNumberRegex],["title",textMax50],["content",textMax1000] ] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const idx = req.session.user.idx;
         const articleIdx = req.params.articleIdx;
@@ -90,7 +93,7 @@ async (req,res) => {
 router.delete("/:articleIdx",
 loginCheck,
 regexCheck( [ ["articleIdx",nonNegativeNumberRegex] ] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const idx = req.session.user.idx;
         const articleIdx = req.params.articleIdx;
@@ -112,7 +115,7 @@ async (req,res) => {
 router.get("/all/search",
 regexCheck( [ ["categoryIdx",nonNegativeNumberRegex],["searchText",textMax50] ] ),
 dataCheck("SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다."),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const categoryIdx = req.query.categoryIdx;
         const searchText = req.body.searchText;
@@ -130,7 +133,7 @@ async (req,res) => {
 router.post("/:articleIdx/like",
 loginCheck,
 regexCheck( [ ["articleIdx",nonNegativeNumberRegex] ] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const idx = req.session.user.idx;
         const articleIdx = req.params.articleIdx;
@@ -151,7 +154,7 @@ async (req,res) => {
 router.delete("/:articleIdx/like",
 loginCheck,
 regexCheck( [ ["articleIdx",nonNegativeNumberRegex] ] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const idx = req.session.user.idx;
         const articleIdx = req.params.articleIdx;
@@ -159,7 +162,7 @@ async (req,res) => {
         // dataCheck도 session 넣어서 해야 할 듯...
         sql = "SELECT idx FROM like_article WHERE user_idx = ? AND article_idx = ?";
         const rows = await readData(sql,[idx,articleIdx]);
-        if(rows.length == 0) throw customError("좋아요가 존재하지 않음.", 404);
+        if(rows.length == 0) throw customError("좋아요가 존재하지 않습니다.", 404);
 
         sql = "DELETE FROM like_article WHERE user_idx = ? AND article_idx = ?";
         await deleteData(sql,[idx,articleIdx]);

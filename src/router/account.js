@@ -2,6 +2,8 @@ const router = require("express").Router(); // express 모듈
 const regex = require("./../constant/regx"); // regex 모듈
 const dbHelper = require("./../module/dbHelper"); // data 모듈
 const customError = require("./../module/customError"); // error 모듈
+const tcWrapper = require("../module/tcWrapper"); // trycatch wrapper
+
 const regexCheck = require("./../middleware/regexCheck"); // 정규포현식체크 미들웨어
 const loginCheck = require("./../middleware/loginCheck");// 로그인체크 미들웨어
 const duplicateCheck = require("./../middleware/duplicateCheck");// 중복체크 미들웨어
@@ -13,8 +15,8 @@ const { insertData, readData, updateData, deleteData } = dbHelper;
 //로그인 (dataCheckMiddleware를 쓰지 않는 이유 : 굳이 2번 db통신을 할 필요는 없다.)
 router.post("/login",
 regexCheck( [ ["id", idRegex],["pw", pwRegex] ] ),
-async (req,res, next) => {
-    try {
+tcWrapper(
+async (req,res) => {
         const { id, pw } = req.body;
 
         const sql = "SELECT idx, grade_idx, name From account WHERE id = ? AND pw = ?";
@@ -31,11 +33,9 @@ async (req,res, next) => {
             name: name
         };
 
-        res.status(200).send({});
-    } catch (e) {
-        next(e);
-    }
+            res.status(200).send({});
 }
+)
 );
 //로그아웃
 router.delete("/logout",
@@ -53,7 +53,7 @@ router.post("/user",
 regexCheck( [ ["id", idRegex],["pw", pwRegex],["name", nameRegex],["phone", phoneRegex] ] ),
 duplicateCheck( "SELECT idx FROM account WHERE id = ?","id",["id"] ),
 duplicateCheck( "SELECT idx FROM account WHERE phone = ?","phone",["phone"] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const { id, pw, name, phone } = req.body;
 
@@ -68,7 +68,7 @@ async (req,res) => {
 router.get("/user",
 loginCheck,
 regexCheck( [ ["pw", pwRegex] ] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const pw = req.body.pw;
         const idx = req.session.user.idx;
@@ -93,7 +93,7 @@ loginCheck,
 regexCheck( [ ["id", idRegex],["pw", pwRegex],["changePw", pwRegex],["name", nameRegex],["phone", phoneRegex] ] ),
 duplicateCheck( "SELECT idx FROM account WHERE id = ?","id",["id"] ),
 duplicateCheck( "SELECT idx FROM account WHERE phone = ?","phone",["phone"] ),
-async (req,res) => {
+async (req,res, next) => {
     let sql;
     try{
         const { id, pw, changePw, name, phone } = req.body;
@@ -116,12 +116,12 @@ router.put("/user/grade",
 loginCheck,
 roleCheck,
 regexCheck( [ ["userIdx",nonNegativeNumberRegex],["userGradeIdx",nonNegativeNumberRegex] ] ),
-async (req,res)=> {
+async (req,res, next)=> {
     try {
         const { userIdx, userGradeIdx } = req.body;
 
         let sql = "UPDATE account SET grade_idx = ? WHERE idx = ?";
-        await updateData(sql,[userGradeIdx,userIdx]);
+        await updateData(sql,[userGradeIdx,userIdx]); //여기 dataCheck 미들웨어 들어가는 게 맞음
         res.status(200).send({});
     } catch(e) {
         next(e);
@@ -131,7 +131,7 @@ async (req,res)=> {
 router.delete("/user",
 loginCheck,
 regexCheck( [ ["pw", pwRegex] ] ),
-async (req,res) => {
+async (req,res, next) => {
     let sql;
     try {
         const pw = req.body.pw;
@@ -152,7 +152,7 @@ async (req,res) => {
 //아이디 찾기
 router.get("/user/id",
 regexCheck( [ ["phone", phoneRegex] ] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const phone = req.body.phone;
 
@@ -169,7 +169,7 @@ async (req,res) => {
 //비밀번호 찾기
 router.get("/user/pw",
 regexCheck( [ ["id", idRegex],["phone", phoneRegex] ] ),
-async (req,res) => {
+async (req,res, next) => {
     try {
         const { id, phone } = req.body;
 
