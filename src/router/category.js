@@ -16,7 +16,7 @@ const { insertData, readData, updateData, deleteData } = dbHelper;
 router.get("/all",
 tcWrapper(
 async (req,res) => {
-    const sql = "SELECT * FROM category ORDER BY idx";
+    const sql = "SELECT * FROM category.list ORDER BY idx";
     const rows = await readData(sql);
     res.status(200).send({
         rows
@@ -31,7 +31,7 @@ tcWrapper(
 async (req,res) => {
     const { categoryName } = req.body;
 
-    const sql = "INSERT INTO category(name) VALUES (?)";
+    const sql = "INSERT INTO category.list(name) VALUES ($1)";
     await insertData(sql,[categoryName]);
     res.status(200).send({});
 }));
@@ -40,14 +40,14 @@ router.put("/:categoryIdx",
 loginCheck,
 roleCheck,
 regexCheck( [ ["categoryIdx", nonNegativeNumberRegex],["categoryName", textMax50] ] ),
-dataCheck( "SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
-duplicateCheck( "SELECT idx FROM category WHERE name = ?","categoryIdx",["categoryName"] ),
+dataCheck( "SELECT name FROM category.list WHERE idx=$1",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
+duplicateCheck( "SELECT idx FROM category.list WHERE name=$1","categoryIdx",["categoryName"] ),
 tcWrapper(
 async (req,res) => {
     const { categoryIdx } = req.params;
     const { categoryName } = req.body;
 
-    const sql = "UPDATE category SET name = ? WHERE idx = ?";
+    const sql = "UPDATE category.list SET name=$1 WHERE idx=$2";
     await updateData(sql,[categoryName,categoryIdx]);
     res.status(200).send({});
 }));
@@ -56,12 +56,12 @@ router.delete("/:categoryIdx",
 loginCheck,
 roleCheck,
 regexCheck( [ ["categoryIdx", nonNegativeNumberRegex] ] ),
-dataCheck( "SELECT name FROM category WHERE idx = ?",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
+dataCheck( "SELECT name FROM category.list WHERE idx=$1",["categoryIdx"],"존재하지 않는 카테고리입니다." ),
 tcWrapper(
 async (req,res) => {
     const { categoryIdx } = req.params;
 
-    const sql = "DELETE FROM category WHERE idx = ?";
+    const sql = "DELETE FROM category.list WHERE idx=$1";
     await deleteData(sql,[categoryIdx]);
     res.status(200).send({});
 }));

@@ -7,7 +7,7 @@ const client = new Pool({
     "host": "localhost",
     "database": "web",
     "port": 5432,
-    "max": 5
+    "max": 10
 });
 
 client.connect();
