@@ -7,13 +7,26 @@ app.use(session({
     secret: "my-secret-key",
     resave: false,
     saveUninitialized: false,
-    cookie: { 
+    cookie: {
         maxAge: 6000000, // 만료 시간 (밀리초 단위)
         httpOnly: true // 사용자가 악의적으로 js 코드를 사용하여 (document.cookie)등을 이용해 쿠키 정보를 얻는 것을 방지
-     } 
+    }
 }));
 
+const cors = require('cors');
+
+app.use(cors());
+
+require("dotenv").config()
+
 app.use(express.json());
+
+
+// const loggingMiddleware = require('./src/middleware/logging');
+// app.use(loggingMiddleware);
+
+const managementRouter = require("./src/router/management");
+app.use("/management", managementRouter);
 
 const accountRouter = require("./src/router/account");
 app.use("/account", accountRouter);
@@ -27,12 +40,15 @@ app.use("/article", articleRouter);
 const commentRouter = require("./src/router/comment");
 app.use("/comment", commentRouter);
 
+const busLifeRouter = require("./src/router/busLife");
+app.use("/busLife", busLifeRouter);
+
 const notFoundMiddleware = require("./src/middleware/notFound");
 app.use(notFoundMiddleware);
 
 const errorHandlerMiddleware = require("./src/middleware/errorHandler");
 app.use(errorHandlerMiddleware);
 
-app.listen(8500, () => {
+server.listen(8500, () => {
     console.log("8500번 포트에서 웹 서버 실행됨");
 });

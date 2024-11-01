@@ -1,10 +1,20 @@
 const customError = require("./../module/customError");
+const jwt = require("jsonwebtoken");
 
-const loginCheck = (req,res, next) => {
+const loginCheck = (req, res, next) => {
     try {
-        if(!req.session.user) throw customError("세션 만료", 401);
+        const { authorization } = req.headers;
+
+        if (!authorization) throw customError("로그인 필요", 401);
+
+        req.decoded = jwt.verify(authorization, process.env.JWT_SIGNATURE_KEY);
+
         next();
-    } catch(e) {
+    } catch (e) {
+        if (e.name === "TokenExpiredError" ||
+            e.name === "JsonWebTokenError") {
+            e.status = 401
+        }
         next(e);
     }
 }

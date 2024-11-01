@@ -1,13 +1,17 @@
 const customError = require("./../module/customError");
+const tcWrapper = require("../module/tcWrapper"); // trycatch wrapper
 
-const roleCheck = (req,res, next) => {
-    const { gradeIdx } = req.session.user;
-    try {
-        if(gradeIdx != 1) throw customError("잘못된 접근", 403);
-        next();
-    } catch(e) {
-        next(e);
-    }
-}
+const roleCheck = (roleType) => {
+    return tcWrapper(
+        async (req, res, next) => {
+
+            const { role } = req.decoded;
+
+            if (role > roleType) throw customError("잘못된 접근", 403);
+
+            next();
+        }
+    )
+};
 
 module.exports = roleCheck;
